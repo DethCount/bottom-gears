@@ -1,0 +1,20 @@
+<head>
+	<script src="./index.js"></script>
+</head>
+<body>
+	<canvas id="screen" width="750px" height="750px" style="border: 1px solid red;"></canvas>
+
+	<script>
+		let screen = document.getElementById('screen')
+		let ctxt = screen.getContext('2d')
+
+		let gear = new Gear(
+			0, 0,
+			0, 0, 0, 20,
+			106, 0.2, 0.2, 20,
+			30, 10
+		)
+
+		gear.render(ctxt)
+	</script>
+</body>
