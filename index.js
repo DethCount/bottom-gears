@@ -1,17 +1,18 @@
+Math.TAU = 2 * Math.PI
+
+Math.deg2rad = (n) => {
+	return n * (Math.PI / 180)
+}
+
 class Gear
 {
 	constructor(
 		x, y,
-		innerTeeths, innerPitchDiameter, innerWidth, innerPressureAngle,
 		outerTeeths, outerPitchDiameter, outerWidth, outerPressureAngle,
 		scale, precision
 	){
 		this.x = x
 		this.y = y
-		this.innerTeeths = innerTeeths
-		this.innerPitchDiameter = innerPitchDiameter
-		this.innerWidth = innerWidth
-		this.innerPressureAngle = innerPressureAngle
 		this.outerTeeths = outerTeeths
 		this.outerPitchDiameter = outerPitchDiameter
 		this.outerWidth = outerWidth
@@ -20,43 +21,238 @@ class Gear
 		this.precision = precision
 	}
 
-	involute2Polar(t, ccw, minDist, maxDist, minTheta, maxTheta) {
-		t = ccw ? 1 - t : t
+	render(ctxt)
+	{
+		const obj = new GearSceneObject(this, ctxt)
+		obj.render()
+	}
+}
+
+class GearSceneObject {
+	constructor(gear, ctxt)
+	{
+		this.gear = gear
+		this.ctxt = ctxt
+
+		this.center = [
+			0.5 * this.ctxt.canvas.width,
+			0.5 * this.ctxt.canvas.height
+		]
+
+		this.pressureAngle = Math.deg2rad(this.gear.outerPressureAngle)
+
+		this.m = this.gear.outerPitchDiameter * this.gear.scale
+		console.log(this.gear, this.m)
+		this.rPrimitif = 0.5 * this.m * this.gear.outerTeeths
+		this.rBase = this.rPrimitif * Math.cos(this.pressureAngle)
+		this.rTete = this.rPrimitif + this.m
+		// console.log('TETE', this.rTete, this.rPrimitif)
+		this.rPied = this.rPrimitif - 1.25 * this.m
+		// console.log('diametres', this.rPrimitif, this.rTete, this.rPied)
+
+		this.rInv = Math.max(this.rPied, this.rBase)
+
+		this.outerHalfToothAngle = Math.PI / this.gear.outerTeeths
+	}
+
+	involutePolar(t, ccw, continuous, minDist, maxDist, minTheta, maxTheta)
+	{
+		if (ccw && continuous) {
+			t = 1 - t
+		}
+
 		let rho = 1 / Math.cos(t)
 		let theta = (ccw ? -1 : 1) * (t - Math.tan(t))
 		// console.log('dev', theta/Math.PI, minTheta, maxTheta, theta)
 
-		if (theta < minTheta || theta > maxTheta) {
+		if ((minTheta !== undefined && theta < minTheta)
+			|| (maxTheta !== undefined && theta > maxTheta)
+		) {
 			return undefined
 		}
 
 		//*
 		// console.log('rho', rho, minDist, maxDist)
-		if (rho < minDist) {
+		if (minDist !== undefined && rho < minDist) {
 			rho = minDist
-		} else if (rho > maxDist) {
+		} else if (maxDist !== undefined && rho > maxDist) {
 			rho = maxDist
 		}
-		// console.log('final rho', rho)
+		// console.log('final rho', rho, minDist, maxDist)
 		//*/
 
 		return [
-			rho * Math.cos(theta),
-			rho * Math.sin(theta)
+			rho,
+			theta
 		]
 	}
 
-	renderHalfTooth(x, y, theta, z, rPrimitif, rTete, rPied, angle, ccw) {
-		let ha = 0.5 * angle
-		let currAngle = ccw ? (theta + angle + ha) : theta
+	involuteXY(t, ccw, continuous, minDist, maxDist, minTheta, maxTheta)
+	{
+		let pos = this.involutePolar(
+			t,
+			ccw,
+			continuous,
+			minDist,
+			maxDist,
+			minTheta,
+			maxTheta
+		)
 
-		ctxt.beginPath()
+		if (pos === undefined) {
+			return undefined
+		}
+
+		return [
+			pos[0] * Math.cos(pos[1]),
+			pos[0] * Math.sin(pos[1])
+		]
+	}
+
+	render(withGuides)
+	{
+		if (withGuides !== false) this.renderGuides()
+
+		this.ctxt.strokeStyle = 'black'
+		for (let n = 0; n < this.gear.outerTeeths; n++) {
+			const currentToothAngle = -2 * n * this.outerHalfToothAngle
+			// console.log(this.center[0], this.center[1], currentToothAngle, this.rPrimitif, this.rTete, this.rPied, this.outerHalfToothAngle)
+
+			this.renderHalfTooth(
+				this.center[0],
+				this.center[1],
+				currentToothAngle,
+				false
+			)
+
+			this.renderHalfTooth(
+				this.center[0],
+				this.center[1],
+				currentToothAngle,
+				true
+			)
+			// break
+		}
+	}
+
+	renderGuides()
+	{
+		this.ctxt.beginPath()
+		this.ctxt.arc(this.center[0], this.center[1], this.rPrimitif, 0, Math.TAU)
+		this.ctxt.strokeStyle = 'red'
+		this.ctxt.stroke()
+
+		this.ctxt.beginPath()
+		this.ctxt.arc(this.center[0], this.center[1], this.rTete, 0, Math.TAU)
+		this.ctxt.strokeStyle = 'orange'
+		this.ctxt.stroke()
+
+		this.ctxt.beginPath()
+		this.ctxt.moveTo(this.center[0], this.center[1])
+		this.ctxt.lineTo(this.center[0] + this.rPrimitif, this.center[1])
+		this.ctxt.strokeStyle = 'blue'
+		this.ctxt.stroke()
+
+		this.ctxt.beginPath()
+		this.ctxt.moveTo(this.center[0], this.center[1])
+		this.ctxt.lineTo(
+			this.center[0] + this.rPrimitif * Math.cos(this.outerHalfToothAngle),
+			this.center[1] + this.rPrimitif * Math.sin(this.outerHalfToothAngle)
+		)
+		this.ctxt.strokeStyle = 'blue'
+		this.ctxt.stroke()
+
+		this.ctxt.beginPath()
+		this.ctxt.moveTo(this.center[0], this.center[1])
+		this.ctxt.lineTo(
+			this.center[0] + this.rPrimitif * Math.cos(2 * this.outerHalfToothAngle),
+			this.center[1] + this.rPrimitif * Math.sin(2 * this.outerHalfToothAngle)
+		)
+		this.ctxt.strokeStyle = 'blue'
+		this.ctxt.stroke()
+
+		this.ctxt.beginPath()
+		this.ctxt.arc(this.center[0], this.center[1], this.rPied, 0, Math.TAU)
+		this.ctxt.strokeStyle = 'green'
+		this.ctxt.stroke()
+
+		for (let n = 1; n <= this.center[0] / this.rInv; n++) {
+			this.ctxt.beginPath()
+			this.ctxt.arc(this.center[0], this.center[1], n * this.rInv, 0, Math.TAU)
+			this.ctxt.strokeStyle = 'blue'
+			this.ctxt.stroke()
+		}
+
+		const tmul = 1.5
+		this.renderSpiral(false, tmul)
+		this.renderSpiral(true, tmul)
+	}
+
+	renderSpiral(ccw, tmul)
+	{
+		ccw = ccw === true
+
+		if (tmul === undefined) {
+			tmul = 1
+		}
+
+		const ba = (ccw ? -1 : 1) * Math.TAU
+
+		for (let n = 0; n <= 2 * this.gear.outerTeeths; n++) {
+			let a = ba * 0.5 * (n / this.gear.outerTeeths) - 0.5 * this.outerHalfToothAngle
+			let cosa = Math.cos(a)
+			let sina = Math.sin(a)
+
+			console.log(n, ccw, n % 2 == 1 * ccw)
+			if (n % 2 == 1 * !ccw) {
+				continue
+			}
+
+			let prevT
+			for (let t = 0; t <= 1; t += 0.01) {
+				if (t > 0) {
+					let p1 = this.involuteXY(tmul * prevT, ccw, false)
+					let p2 = this.involuteXY(tmul * t, ccw, false)
+					// console.log(p1, p2)
+
+					let p11 = [
+						this.center[0] + this.rInv * (p1[0] * cosa - p1[1] * sina),
+						this.center[1] - this.rInv * (p1[0] * sina + p1[1] * cosa)
+					]
+
+					let p22 = [
+						this.center[0] + this.rInv * (p2[0] * cosa - p2[1] * sina),
+						this.center[1] - this.rInv * (p2[0] * sina + p2[1] * cosa)
+					]
+
+					// console.log(p11, p22)
+
+					this.ctxt.beginPath()
+					this.ctxt.moveTo(p11[0], p11[1])
+					this.ctxt.lineTo(p22[0], p22[1])
+					this.ctxt.strokeStyle = ccw ? 'red' : 'green'
+					this.ctxt.stroke()
+				}
+
+				prevT = t
+			}
+
+			//if (n > 1) break
+		}
+	}
+
+	renderHalfTooth(x, y, theta, ccw)
+	{
+		let ha = 0.5 * this.outerHalfToothAngle
+		let currAngle = ccw ? (theta + this.outerHalfToothAngle + ha) : theta
+
+		this.ctxt.beginPath()
 
 		if (!ccw) {
-			ctxt.arc(
+			this.ctxt.arc(
 				x,
 				y,
-				rPied,
+				this.rPied,
 				currAngle,
 				currAngle + ha
 			)
@@ -66,130 +262,45 @@ class Gear
 
 		let currCos = Math.cos(-currAngle)
 		let currSin = Math.sin(-currAngle)
-		// console.log(currAngle, angle, theta, currCos, currSin)
-		// console.log('tete', rTete/rPied, rTete)
+		// console.log(currAngle, this.outerHalfToothAngle, theta, currCos, currSin)
+		// console.log('tete', this.rTete/this.rPied, this.rTete)
 
 		for (let t = 0; t <= 1; t += 0.01) {
 			let pos
-			let invAngle = Math.PI / (2 * z)
+			let invAngle = Math.PI / (2 * this.gear.outerTeeths)
 
-			pos = this.involute2Polar(
+			pos = this.involuteXY(
 				t,
 				ccw,
+				true,
 				1,
-				rTete / rPied,
+				this.rTete / this.rInv,
 				ccw ? 0 : -invAngle,
-				ccw ? invAngle : 0,
-				ha
+				ccw ? invAngle : 0
 			)
+
+			// console.log(pos)
 
 			if (pos === undefined) {
 				continue
 			}
 
-			let tx = x + rPied * (pos[0] * currCos - pos[1] * currSin)
-			let ty = y - rPied * (pos[0] * currSin + pos[1] * currCos)
+			let tx = x + this.rInv * (pos[0] * currCos - pos[1] * currSin)
+			let ty = y - this.rInv * (pos[0] * currSin + pos[1] * currCos)
 
-			ctxt.lineTo(tx, ty)
+			this.ctxt.lineTo(tx, ty)
 		}
 
 		if (ccw) {
-			ctxt.arc(
+			this.ctxt.arc(
 				x,
 				y,
-				rPied,
+				this.rPied,
 				currAngle,
 				currAngle + ha
 			)
 		}
 
-		ctxt.stroke()
-	}
-
-	render(ctxt) {
-		let hw = 0.5 * ctxt.canvas.width
-		let hh = 0.5 * ctxt.canvas.height
-		let cx = hw
-		let cy = hh
-
-		let pressureAngle = this.outerPressureAngle * (Math.PI / 180)
-
-		let m = this.outerPitchDiameter * this.scale
-		let rPrimitif = 0.5 * m * this.outerTeeths
-		// let rBase = rPrimitif * Math.cos(pressureAngle)
-		let rTete = rPrimitif + m
-		// console.log('TETE', rTete, rPrimitif)
-		let rPied = rPrimitif - 1.25 * m
-		// console.log('diametres', rPrimitif, rTete, rPied)
-
-		let outerHalfToothAngle = Math.PI / this.outerTeeths
-
-		ctxt.beginPath()
-		ctxt.arc(hw, hh, rPrimitif, 0, 2 * Math.PI)
-		ctxt.strokeStyle = 'red'
-		ctxt.stroke()
-
-		ctxt.beginPath()
-		ctxt.arc(cx, cy, rTete, 0, 2 * Math.PI)
-		ctxt.strokeStyle = 'orange'
-		ctxt.stroke()
-
-		ctxt.beginPath()
-		ctxt.moveTo(cx, cy)
-		ctxt.lineTo(cx + rPrimitif, cy)
-		ctxt.strokeStyle = 'blue'
-		ctxt.stroke()
-
-		ctxt.beginPath()
-		ctxt.moveTo(cx, cy)
-		ctxt.lineTo(
-			cx + rPrimitif * Math.cos(outerHalfToothAngle),
-			cy + rPrimitif * Math.sin(outerHalfToothAngle)
-		)
-		ctxt.strokeStyle = 'blue'
-		ctxt.stroke()
-
-		ctxt.beginPath()
-		ctxt.moveTo(cx, cy)
-		ctxt.lineTo(
-			cx + rPrimitif * Math.cos(2 * outerHalfToothAngle),
-			cy + rPrimitif * Math.sin(2 * outerHalfToothAngle)
-		)
-		ctxt.strokeStyle = 'blue'
-		ctxt.stroke()
-
-		ctxt.beginPath()
-		ctxt.arc(cx, cy, rPied, 0, 2 * Math.PI)
-		ctxt.strokeStyle = 'green'
-		ctxt.stroke()
-
-		ctxt.strokeStyle = 'black'
-		for (let n = 0; n < this.outerTeeths; n++) {
-			let currentToothAngle = -2 * n * outerHalfToothAngle
-			// console.log(cx, cy, currentToothAngle, rPrimitif, rTete, rPied, outerHalfToothAngle)
-			this.renderHalfTooth(
-				cx,
-				cy,
-				currentToothAngle,
-				this.outerTeeths,
-				rPrimitif,
-				rTete,
-				rPied,
-				outerHalfToothAngle,
-				false
-			)
-			this.renderHalfTooth(
-				cx,
-				cy,
-				currentToothAngle,
-				this.outerTeeths,
-				rPrimitif,
-				rTete,
-				rPied,
-				outerHalfToothAngle,
-				true
-			)
-			//break
-		}
+		this.ctxt.stroke()
 	}
 }
