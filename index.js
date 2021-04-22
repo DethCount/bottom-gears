@@ -42,7 +42,7 @@ class GearSceneObject {
 		this.pressureAngle = Math.deg2rad(this.gear.outerPressureAngle)
 
 		this.m = this.gear.outerPitchDiameter * this.gear.scale
-		console.log(this.gear, this.m)
+		// console.log(this.gear, this.m)
 		this.rPrimitif = 0.5 * this.m * this.gear.outerTeeths
 		this.rBase = this.rPrimitif * Math.cos(this.pressureAngle)
 		this.rTete = this.rPrimitif + this.m
@@ -171,6 +171,12 @@ class GearSceneObject {
 		this.ctxt.strokeStyle = 'blue'
 		this.ctxt.stroke()
 
+
+		this.ctxt.beginPath()
+		this.ctxt.arc(this.center[0], this.center[1], this.rBase, 0, Math.TAU)
+		this.ctxt.strokeStyle = 'purple'
+		this.ctxt.stroke()
+
 		this.ctxt.beginPath()
 		this.ctxt.arc(this.center[0], this.center[1], this.rPied, 0, Math.TAU)
 		this.ctxt.strokeStyle = 'green'
@@ -203,7 +209,6 @@ class GearSceneObject {
 			let cosa = Math.cos(a)
 			let sina = Math.sin(a)
 
-			console.log(n, ccw, n % 2 == 1 * ccw)
 			if (n % 2 == 1 * !ccw) {
 				continue
 			}
