@@ -3,7 +3,7 @@ import mathutils
 import math
 
 m = 1.0
-z = 106
+z = 10
 pressureAngle = 20.0 * (math.pi / 180.0)
 cx = 0.0
 cy = 0.0
@@ -66,7 +66,7 @@ def renderArc(x, y, r, thetaStart, thetaStop):
         theta += thetaStep
 
 
-def renderHalfTooth(x, y, theta, z, rPrimitif, rTete, rPied, angle, firstHalf):
+def renderHalfTooth(x, y, theta, z, rPrimitif, rInv, rTete, rPied, angle, firstHalf):
     ha = 0.5 * angle
     currAngle = (theta + angle + ha, theta)[firstHalf]
     print('firstHalf: ' + str(firstHalf) + ' theta: ' + str(theta) + ' currAngle: ' + str(currAngle))
@@ -97,7 +97,7 @@ def renderHalfTooth(x, y, theta, z, rPrimitif, rTete, rPied, angle, firstHalf):
             t / 100,
             firstHalf,
             1.0,
-            rTete / rPied,
+            rTete / rInv,
             (0.0, -invAngle)[not firstHalf],
             (invAngle, 0.0)[not firstHalf]
         )
@@ -108,8 +108,8 @@ def renderHalfTooth(x, y, theta, z, rPrimitif, rTete, rPied, angle, firstHalf):
             continue
 
         vertices.append(mathutils.Vector([
-            x + rPied * (pos[0] * currCos - pos[1] * currSin),
-            y + rPied * (pos[0] * currSin + pos[1] * currCos),
+            x + rInv * (pos[0] * currCos - pos[1] * currSin),
+            y + rInv * (pos[0] * currSin + pos[1] * currCos),
             0.0
         ]))
 
@@ -126,8 +126,10 @@ def renderHalfTooth(x, y, theta, z, rPrimitif, rTete, rPied, angle, firstHalf):
 
 def render():
     rPrimitif = 0.5 * m * z
+    rBase = rPrimitif * math.cos(pressureAngle)
     rTete = rPrimitif + m
     rPied = rPrimitif - 1.25 * m
+    rInv = max(rPied, rBase)
 
     ha = math.pi / z
     for n in range(0, z):
@@ -140,6 +142,7 @@ def render():
             currentToothAngle,
             z,
             rPrimitif,
+            rInv,
             rTete,
             rPied,
             ha,
@@ -152,6 +155,7 @@ def render():
             currentToothAngle,
             z,
             rPrimitif,
+            rInv,
             rTete,
             rPied,
             ha,
